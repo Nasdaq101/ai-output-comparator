@@ -63,7 +63,18 @@ Open: http://localhost:5173
 
 All endpoints at `http://localhost:3001/api/`:
 
+### AI Endpoints
 - `GET /health` - Health check
 - `POST /groq` - Groq only (Llama 3.3 70B)
 - `POST /gemini` - Gemini only
-- `POST /compare` - Compare both
+- `POST /compare` - Compare both AI models
+
+### Authentication Endpoints
+- `POST /auth/register` - User registration
+- `POST /auth/login` - User login
+- `GET /auth/user` - Get current user info
+
+### User Endpoints
+- `GET /history` - Get user's query history (last 5 queries)
+- `GET /profile` - Get user profile
+- `PUT /profile/update` - Update user profile
