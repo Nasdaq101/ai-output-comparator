@@ -7,6 +7,8 @@ const AI_MODELS = [
   { name: 'Gemini', badge: 'Google', icon: '✨', color: 'gemini', key: 'gemini' }
 ];
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 function App() {
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
@@ -37,14 +39,14 @@ function App() {
       let endpoint;
       switch (compareMode) {
         case 'groq':
-          endpoint = 'http://localhost:3001/api/ai/groq';
+          endpoint = `${API_BASE_URL}/api/ai/groq`
           break;
         case 'gemini':
-          endpoint = 'http://localhost:3001/api/ai/gemini';
+          endpoint = `${API_BASE_URL}/api/ai/gemini`
           break;
         case 'both':
         default:
-          endpoint = 'http://localhost:3001/api/ai/compare';
+          endpoint = `${API_BASE_URL}/api/ai/compare`
           break;
       }
 
@@ -86,7 +88,7 @@ function App() {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch('http://localhost:3001/api/users/queries', {
+      const response = await fetch(`${API_BASE_URL}/api/users/queries`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -129,8 +131,8 @@ function App() {
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-
-      const response = await fetch('http://localhost:3001/api/ai/compare-with-rubric', {
+      `${API_BASE_URL}`
+      const response = await fetch(`${API_BASE_URL}/api/ai/compare-with-rubric`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ 
@@ -451,8 +453,8 @@ const AuthModal = ({ mode, onClose, onSuccess }) => {
 
     try {
       const endpoint = mode === 'login' 
-        ? 'http://localhost:3001/api/auth/login'
-        : 'http://localhost:3001/api/auth/register';
+        ? `${API_BASE_URL}/api/auth/login`
+        : `${API_BASE_URL}/api/auth/register`
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -569,7 +571,7 @@ const ProfileModal = ({ onClose }) => {
   const fetchProfile = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/users/profile', {
+      const response = await fetch(`${API_BASE_URL}/api/users/profile`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -595,7 +597,7 @@ const ProfileModal = ({ onClose }) => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/users/profile', {
+      const response = await fetch(`${API_BASE_URL}/api/users/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
