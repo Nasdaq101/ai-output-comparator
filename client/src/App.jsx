@@ -109,6 +109,7 @@ function App() {
 
   const handleClear = () => {
     setPrompt('');
+    setSystemPrompt('');
     setResponses({});
     setRubricEvaluation(null);
     setShowRubric(false);
@@ -352,11 +353,26 @@ function App() {
           history={history}
           onClose={() => setShowHistoryModal(false)}
           onSelectQuery={(query) => {
-            // Set the prompt and mode
-            setPrompt(query.prompt);
+            const fullPrompt = query.prompt;
+            const separator = '\n\n';
+            
+            if (fullPrompt.includes(separator)) {
+              const parts = fullPrompt.split(separator);
+              // system promp - then user prompt
+              const systemPromptPart = parts[0];
+              const userPromptPart = parts.slice(1).join(separator);
+              
+              setSystemPrompt(systemPromptPart);
+              setPrompt(userPromptPart);
+            } else {
+              // user prompt only
+              setSystemPrompt('');
+              setPrompt(fullPrompt);
+            }
+            
+            // set the mode and display the responses in the main cards
             setCompareMode(query.mode);
             
-            // Display the responses in the main cards
             const responsesToShow = {};
             if (query.responses.groq) {
               responsesToShow.groq = {
