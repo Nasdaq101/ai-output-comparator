@@ -28,7 +28,8 @@ export default function Signup({ onSuccess }) {
 
       let data = null;
       try {
-        data = await response.json();
+        const text = await response.text();
+        data = text ? JSON.parse(text) : null;
         console.log('REGISTER RESPONSE:', data);
       } catch {
         data = null;
@@ -39,7 +40,6 @@ export default function Signup({ onSuccess }) {
         return;
       }
 
-      // ✅ success path
       if (data?.tokens?.access) {
         localStorage.setItem('token', data.tokens.access);
         localStorage.setItem('refresh', data.tokens.refresh);
@@ -47,10 +47,10 @@ export default function Signup({ onSuccess }) {
       }
 
       if (typeof onSuccess === 'function') {
-        onSuccess(data.user);
+        onSuccess(data.user, data.tokens);
       }
 
-      navigate('/'); // ✅ NOW this won't crash
+      navigate('/');
 
     } catch (err) {
       console.error('REAL network error:', err);
@@ -59,6 +59,7 @@ export default function Signup({ onSuccess }) {
       setLoading(false);
     }
   };
+
 
   return (
     <div className="auth-wrapper">

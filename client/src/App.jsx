@@ -1,112 +1,165 @@
-import { useState, useEffect } from 'react';
-import './App.css';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import About from './pages/About';
+import { useState, useEffect } from "react";
+import "./App.css";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
+// Pages
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import About from "./pages/About";
 
+// Components
+import Header from "./components/Header";
+import Footer from "./components/Footer";
+import PromptForm from "./components/PromptForm";
+import ResponseCard from "./components/ResponseCard";
+import RubricEvaluation from "./components/RubricEvaluation";
+import AuthModal from "./components/AuthModal";
+import HistoryModal from "./components/HistoryModal";
+import ProfileModal from "./components/ProfileModal";
 
-// AI Models Configuration
-const AI_MODELS = [
-  { name: 'Groq', badge: 'Llama 3.3 70B', icon: '⚡', color: 'groq', key: 'groq' },
-  { name: 'Gemini', badge: 'Google', icon: '✨', color: 'gemini', key: 'gemini' }
-];
+// Hooks
+import { useAuth } from "./hooks/useAuth";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
+const AI_MODELS = [
+  { name: "Groq", badge: "Llama 3.3 70B", icon: "⚡", color: "groq", key: "groq" },
+  { name: "Gemini", badge: "Google", icon: "✨", color: "gemini", key: "gemini" }
+];
+
 function App() {
+  const { user, login, logout } = useAuth();
+
   const [prompt, setPrompt] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [responses, setResponses] = useState({});
-  const [compareMode, setCompareMode] = useState('both'); // 'both', 'groq', or 'gemini'
-  const [user, setUser] = useState(null);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authMode, setAuthMode] = useState('login'); // 'login' or 'signup', same below
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [history, setHistory] = useState([]);
-  const [showProfileModal, setShowProfileModal] = useState(false);
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    return saved ? JSON.parse(saved) : false;
-  });
   const [systemPrompt, setSystemPrompt] = useState('');
+  const [responses, setResponses] = useState({});
+  const [compareMode, setCompareMode] = useState('both');
+  const [loading, setLoading] = useState(false);
+  
+  const [history, setHistory] = useState([]);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState('login');
+
   const [rubricEvaluation, setRubricEvaluation] = useState(null);
   const [showRubric, setShowRubric] = useState(false);
 
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem("darkMode");
+    return saved ? JSON.parse(saved) : false;
+  });
+
+  const toggleDarkMode = () => setDarkMode(!darkMode);
+
+  useEffect(() => {
+    document.body.classList.toggle("dark-mode", darkMode);
+    localStorage.setItem("darkMode", JSON.stringify(darkMode));
+  }, [darkMode]);
+
+  // API: normal submit
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!prompt.trim()) return alert('Please enter a question');
+    if (!prompt.trim()) return alert("Please enter a question");
 
     setLoading(true);
     setResponses({});
 
     try {
-      let endpoint;
-      switch (compareMode) {
-        case 'groq':
-          endpoint = `${API_BASE_URL}/api/ai/groq`
-          break;
-        case 'gemini':
-          endpoint = `${API_BASE_URL}/api/ai/gemini`
-          break;
-        case 'both':
-        default:
-          endpoint = `${API_BASE_URL}/api/ai/compare`
-          break;
-      }
+      let endpoint =
+        compareMode === "groq"
+          ? `${API_BASE_URL}/api/ai/groq`
+          : compareMode === "gemini"
+          ? `${API_BASE_URL}/api/ai/gemini`
+          : `${API_BASE_URL}/api/ai/compare`;
 
-      const token = localStorage.getItem('token');
-      const headers = { 'Content-Type': 'application/json' };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
+      const token = localStorage.getItem("token");
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const body = {
+        prompt: systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt,
+      };
 
       const response = await fetch(endpoint, {
-        method: 'POST',
+        method: "POST",
         headers,
-        body: JSON.stringify({ 
-          prompt: systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt 
-        })
+        body: JSON.stringify(body),
       });
 
-      if (!response.ok) throw new Error('Failed to get responses');
-      
-      const responseData = await response.json();
+      const data = await response.json();
 
-      if (compareMode === 'groq') {
-        setResponses({ groq: responseData });
-      } else if (compareMode === 'gemini') {
-        setResponses({ gemini: responseData });
-      } else {
-        setResponses(responseData);
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      alert('Failed to get AI responses. Make sure the server is running.');
+      if (!response.ok) throw new Error("Failed to get responses");
+
+      if (compareMode === "groq") setResponses({ groq: data });
+      else if (compareMode === "gemini") setResponses({ gemini: data });
+      else setResponses(data);
+
+    } catch (err) {
+      alert("Failed to get AI responses. Check server.");
     } finally {
       setLoading(false);
     }
   };
 
+  // API: rubric comparison
+  const handleCompareWithRubric = async (e) => {
+    e.preventDefault();
+    if (!prompt.trim()) return alert("Please enter a question");
+
+    setLoading(true);
+    setResponses({});
+    setRubricEvaluation(null);
+    setShowRubric(false);
+
+    try {
+      const token = localStorage.getItem("token");
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const response = await fetch(`${API_BASE_URL}/api/ai/compare-with-rubric`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          prompt: systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error("Failed to get responses");
+
+      setResponses({
+        groq: data.responses.groq,
+        gemini: data.responses.gemini,
+      });
+
+      if (data.evaluation?.success) {
+        setRubricEvaluation(data.evaluation);
+        setShowRubric(true);
+      }
+    } catch (err) {
+      alert("Rubric comparison failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // history fetch
   const fetchHistory = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) return;
 
       const response = await fetch(`${API_BASE_URL}/api/users/queries`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!response.ok) throw new Error('Failed to fetch history');
-      
       const data = await response.json();
+      if (!response.ok) throw new Error("Failed");
+
       setHistory(data.history || []);
-    } catch (error) {
-      console.error('Error fetching history:', error);
-      alert('Failed to fetch history');
+    } catch {
+      alert("Failed to fetch history");
     }
   };
 
@@ -122,842 +175,120 @@ function App() {
     setShowRubric(false);
   };
 
-  const handleCompareWithRubric = async (e) => {
-    e.preventDefault();
-    if (!prompt.trim()) return alert('Please enter a question');
-
-    setLoading(true);
-    setResponses({});
-    setRubricEvaluation(null);
-    setShowRubric(false);
-
-    try {
-      const token = localStorage.getItem('token');
-      const headers = { 'Content-Type': 'application/json' };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      `${API_BASE_URL}`
-      const response = await fetch(`${API_BASE_URL}/api/ai/compare-with-rubric`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ 
-          prompt: systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt 
-        })
-      });
-
-      if (!response.ok) throw new Error('Failed to get responses');
-      
-      const data = await response.json();
-
-      // Set responses
-      setResponses({
-        groq: data.responses.groq,
-        gemini: data.responses.gemini
-      });
-
-      // Set rubric evaluation
-      if (data.evaluation && data.evaluation.success) {
-        setRubricEvaluation(data.evaluation);
-        setShowRubric(true);
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      alert('Failed to get AI responses with rubric. Make sure the server is running.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Check for existing auth token on mount
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
-    if (token && storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-  }, []);
-
-  // Dark mode effect
-  useEffect(() => {
-    localStorage.setItem('darkMode', JSON.stringify(darkMode));
-    document.body.classList.toggle('dark-mode', darkMode);
-  }, [darkMode]);
-
-  const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setUser(null);
-  };
-
-  const openAuthModal = (mode) => {
-    setAuthMode(mode);
-    setShowAuthModal(true);
-  };
-
   return (
     <Router>
-    <div className="app">
-      <header className="header">
-        
+      <div className="app">
 
-        <div className="header-content">
-          <div className="header-text">
-            {user && (
-              <button onClick={handleShowHistory} className="auth-btn history-btn-left">
-                📜 History
-              </button>
-            )}
-            <div className="header-title">
-              <h1> United Chats of America 🇺🇸 </h1>
-              <p>Compare responses from different AI models</p>
-            </div>
-          </div>
-          <div className="header-auth">
-            <button onClick={toggleDarkMode} className="auth-btn theme-btn" title="Toggle theme">
-              {darkMode ? '☀️' : '🌙'}
-            </button>
-            <Link to="/about" className="auth-btn login-btn">About</Link>
-            {user ? (
-              <div className="user-menu">
-                <span className="user-name">👤 {user.username}</span>
-                <button onClick={() => setShowProfileModal(true)} className="auth-btn profile-btn">
-                  Profile
-                </button>
-                <button onClick={handleLogout} className="auth-btn logout-btn">
-                  Logout
-                </button>
-              </div>
-            ) : (
-              <div className="auth-buttons">
-                <Link to="/login" className="auth-btn login-btn">Sign In</Link>
-                <Link to="/signup" className="auth-btn signup-btn">Sign Up</Link>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
-
-      <Routes>
-        <Route path="/about" element={<About />} />
-        <Route
-          path="/login"
-          element={<Login onSuccess={(user) => setUser(user)} />}
+        <Header
+          user={user}
+          darkMode={darkMode}
+          onToggleTheme={toggleDarkMode}
+          onLogout={logout}
+          onShowHistory={handleShowHistory}
+          onShowProfile={() => setShowProfileModal(true)}
         />
-        <Route
-          path="/signup"
-          element={<Signup onSuccess={(user) => setUser(user)} />}
-        />
-        <Route
-          path="/"
-          element={
-            <div className="container">
-              <form onSubmit={handleSubmit} className="input-section">
-                {/* System Prompt */}
-                <div className="system-prompt-section">
-                  <label className="system-prompt-label">
-                    🤖 System Prompt (Optional)
-                    <span className="system-prompt-hint">Set custom instructions for the AI</span>
-                  </label>
-                  <textarea
-                    value={systemPrompt}
-                    onChange={(e) => setSystemPrompt(e.target.value)}
-                    placeholder="e.g., 'You are a helpful coding assistant' or 'Explain like I'm 5'"
-                    rows="2"
-                    disabled={loading}
-                    className="system-prompt-input"
-                  />
-                </div>
 
-                <textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Enter your question here"
-                  rows="4"
-                  disabled={loading}
-                  className="prompt-input"
+        <Routes>
+          <Route path="/about" element={<About />} />
+
+          <Route
+            path="/login"
+            element={<Login onSuccess={(u) => login(u.user, u.tokens.access)} />}
+          />
+
+          <Route
+            path="/signup"
+            element={<Signup onSuccess={(user, tokens) => login(user, tokens?.access)} />}
+          />
+
+          <Route
+            path="/"
+            element={
+              <div className="container">
+
+                <PromptForm
+                  prompt={prompt}
+                  systemPrompt={systemPrompt}
+                  compareMode={compareMode}
+                  loading={loading}
+                  onPromptChange={setPrompt}
+                  onSystemPromptChange={setSystemPrompt}
+                  onCompareModeChange={setCompareMode}
+                  onSubmit={handleSubmit}
+                  onRubric={handleCompareWithRubric}
+                  onClear={handleClear}
                 />
-                
-                {/* Compare Mode Selector */}
-                <div className="mode-selector">
-                  <label className="mode-label">Select AI model:</label>
-                  <div className="mode-options">
-                    <button
-                      type="button"
-                      className={`mode-btn ${compareMode === 'both' ? 'active' : ''}`}
-                      onClick={() => setCompareMode('both')}
-                      disabled={loading}
-                    >
-                      🔄 Groq and Gemini
-                    </button>
-                    <button
-                      type="button"
-                      className={`mode-btn ${compareMode === 'groq' ? 'active' : ''}`}
-                      onClick={() => setCompareMode('groq')}
-                      disabled={loading}
-                    >
-                      ⚡ Only Groq
-                    </button>
-                    <button
-                      type="button"
-                      className={`mode-btn ${compareMode === 'gemini' ? 'active' : ''}`}
-                      onClick={() => setCompareMode('gemini')}
-                      disabled={loading}
-                    >
-                      ✨ Only Gemini
-                    </button>
-                  </div>
+
+                <div className="responses-section">
+                  {AI_MODELS
+                    .filter(m => compareMode === "both" || m.key === compareMode)
+                    .map(m => (
+                      <ResponseCard
+                        key={m.key}
+                        {...m}
+                        data={responses[m.key]}
+                        loading={loading}
+                      />
+                    ))}
                 </div>
 
-                <div className="button-group">
-                  <button type="submit" disabled={loading} className="submit-btn">
-                    {loading ? '🔄 Loading...' : '✨ Get AI Response'}
-                  </button>
-                  <button 
-                    type="button" 
-                    onClick={handleCompareWithRubric} 
-                    disabled={loading || compareMode !== 'both'} 
-                    className="rubric-btn"
-                    title={compareMode !== 'both' ? 'Rubric comparison only works in "Both" mode' : 'Compare with AI-powered evaluation'}
-                  >
-                    {loading ? '🔄 Loading...' : '📊 Compare with Rubric'}
-                  </button>
-                  <button type="button" onClick={handleClear} disabled={loading} className="clear-btn">
-                    🗑️ Clear
-                  </button>
-                </div>
-              </form>
-
-              <div className="responses-section">
-                {AI_MODELS
-                  .filter(model => compareMode === 'both' || model.key === compareMode)
-                  .map(model => (
-                    <ResponseCard
-                      key={model.key}
-                      {...model}
-                      data={responses[model.key]}
-                      loading={loading}
-                    />
-                  ))}
+                {showRubric && rubricEvaluation && (
+                  <RubricEvaluation evaluation={rubricEvaluation} />
+                )}
               </div>
-
-              {/* Rubric Evaluation Section */}
-              {showRubric && rubricEvaluation && (
-                <RubricEvaluation evaluation={rubricEvaluation} />
-              )}
-            </div>
-            } />
-          </Routes>
-
-
-      <footer className="footer">
-        <p>CS5610 - Final Project</p>
-      </footer>
-
-      {showAuthModal && (
-        <AuthModal
-          mode={authMode}
-          onClose={() => setShowAuthModal(false)}
-          onSuccess={(userData) => {
-            setUser(userData.user);
-            localStorage.setItem('token', userData.tokens.access);
-            localStorage.setItem('user', JSON.stringify(userData.user));
-            setShowAuthModal(false);
-          }}
-        />
-      )}
-
-      {showHistoryModal && (
-        <HistoryModal
-          history={history}
-          onClose={() => setShowHistoryModal(false)}
-          onSelectQuery={(query) => {
-            // Set the prompt and mode
-            setPrompt(query.prompt);
-            setCompareMode(query.mode);
-            
-            // Display the responses in the main cards
-            const responsesToShow = {};
-            if (query.responses.groq) {
-              responsesToShow.groq = {
-                model: 'Groq',
-                response: query.responses.groq,
-                timestamp: query.created_at
-              };
             }
-            if (query.responses.gemini) {
-              responsesToShow.gemini = {
-                model: 'Gemini',
-                response: query.responses.gemini,
-                timestamp: query.created_at
-              };
-            }
-            setResponses(responsesToShow);
-            
-            setShowHistoryModal(false);
-          }}
-        />
-      )}
+          />
+        </Routes>
 
-      {showProfileModal && (
-        <ProfileModal
-          onClose={() => setShowProfileModal(false)}
-        />
-      )}
-    </div>
+        <Footer />
+
+        {showHistoryModal && (
+          <HistoryModal
+            history={history}
+            onClose={() => setShowHistoryModal(false)}
+            onSelectQuery={(query) => {
+              setPrompt(query.prompt);
+              setCompareMode(query.mode);
+
+              const r = {};
+              if (query.responses.groq) {
+                r.groq = {
+                  model: 'Groq',
+                  response: query.responses.groq,
+                  timestamp: query.created_at,
+                };
+              }
+              if (query.responses.gemini) {
+                r.gemini = {
+                  model: 'Gemini',
+                  response: query.responses.gemini,
+                  timestamp: query.created_at,
+                };
+              }
+              setResponses(r);
+
+              setShowHistoryModal(false);
+            }}
+          />
+        )}
+
+        {showAuthModal && (
+          <AuthModal
+            mode={authMode}
+            onClose={() => setShowAuthModal(false)}
+            onSuccess={(result) => {
+              login(result.user, result.tokens.access);
+              setShowAuthModal(false);
+            }}
+          />
+        )}
+
+        {showProfileModal && (
+          <ProfileModal onClose={() => setShowProfileModal(false)} />
+        )}
+      </div>
     </Router>
   );
 }
 
 export default App;
-
-
-
-
-const ResponseCard = ({ name, badge, icon, color, data, loading }) => (
-  <div className="response-card">
-    <div className={`card-header ${color}-header`}>
-      <h2>{icon} {name}</h2>
-      <span className="badge">{badge}</span>
-    </div>
-    <div className="card-body">
-      {loading && !data && (
-        <div className="loading-spinner">
-          <div className="spinner"></div>
-          <p>Getting response from {name}...</p>
-        </div>
-      )}
-      {data && (
-        <div className="response-content">
-          {data.error ? (
-            <div className="error-message">
-              <p>⚠️ {data.response}</p>
-              <small>{data.error}</small>
-            </div>
-          ) : (
-            <>
-              <p>{data.response}</p>
-              {data.timestamp && (
-                <div className="timestamp">
-                  {new Date(data.timestamp).toLocaleString()}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
-      {!loading && !data && (
-        <div className="empty-state">
-          <p>No response yet. Enter a question and click "Compare AI Responses"</p>
-        </div>
-      )}
-    </div>
-  </div>
-);
-
-// Auth Modal Component
-const AuthModal = ({ mode, onClose, onSuccess }) => {
-  const [formData, setFormData] = useState({
-    username: '',
-    email: '',
-    password: '',
-  });
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-
-    try {
-      const endpoint = mode === 'login' 
-        ? `${API_BASE_URL}/api/auth/login`
-        : `${API_BASE_URL}/api/auth/register`
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || 'Authentication failed');
-        setLoading(false);
-        return;
-      }
-
-      onSuccess(data);
-    } catch (err) {
-      setError('Network error. Please try again.');
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <button className="modal-close" onClick={onClose}>×</button>
-        <h2>{mode === 'login' ? 'Sign In' : 'Sign Up'}</h2>
-        
-        <form onSubmit={handleSubmit} className="auth-form">
-          {error && <div className="message-error">{error}</div>}
-          
-          {mode === 'signup' && (
-            <div className="form-group">
-              <label>Username</label>
-              <input
-                type="text"
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                required
-                disabled={loading}
-              />
-            </div>
-          )}
-
-          <div className="form-group">
-            <label>Email</label>
-            <input
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              required
-              disabled={loading}
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Password</label>
-            <input
-              type="password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              required
-              disabled={loading}
-            />
-          </div>
-
-          <button type="submit" className="auth-submit-btn" disabled={loading}>
-            {loading ? '⏳ Please wait...' : mode === 'login' ? 'Sign In' : 'Sign Up'}
-          </button>
-        </form>
-
-        <p className="auth-switch">
-          {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
-          <button 
-            className="auth-switch-btn" 
-            onClick={() => {
-              setError('');
-              setFormData({ username: '', email: '', password: '' });
-              onClose();
-              setTimeout(() => {
-                document.querySelector(mode === 'login' ? '.signup-btn' : '.login-btn')?.click();
-              }, 100);
-            }}
-          >
-            {mode === 'login' ? 'Sign Up' : 'Sign In'}
-          </button>
-        </p>
-      </div>
-    </div>
-  );
-};
-
-// Profile Modal Component
-const ProfileModal = ({ onClose }) => {
-  const [profile, setProfile] = useState({
-    email: '',
-    username: '',
-    first_name: '',
-    last_name: '',
-    phone: '',
-    location: '',
-    bio: ''
-  });
-  const [loading, setLoading] = useState(true);
-  //to prevent double submission
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-
-  useEffect(() => {
-    fetchProfile();
-  }, []);
-
-  const fetchProfile = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/users/profile`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) throw new Error('Failed to fetch profile');
-      
-      const data = await response.json();
-      setProfile(data.profile);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-      setError('Failed to load profile');
-      setLoading(false);
-    }
-  };
-
-  const handleSave = async (e) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
-    setSaving(true);
-
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/users/profile`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          first_name: profile.first_name || '',
-          last_name: profile.last_name || '',
-          phone: profile.phone || '',
-          location: profile.location || '',
-          bio: profile.bio || ''
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update profile');
-      }
-      
-      const data = await response.json();
-      setProfile(data.profile);
-      setSuccess('Profile updated successfully!');
-      setSaving(false);
-      
-      setTimeout(() => {
-        onClose();
-      }, 500);
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      setError(error.message || 'Failed to update profile. Please try again.');
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content profile-modal-content" onClick={(e) => e.stopPropagation()}>
-        <button className="modal-close" onClick={onClose}>×</button>
-        <h2>👤 User Profile</h2>
-        
-        {loading ? (
-          <div className="loading-spinner">
-            <div className="spinner"></div>
-            <p>Loading profile...</p>
-          </div>
-        ) : (
-          <form onSubmit={handleSave} className="profile-form">
-            {error && <div className="message-error">{error}</div>}
-            {success && <div className="message-success">{success}</div>}
-            
-            <div className="profile-section">
-              <h3>Account Information</h3>
-              <div className="form-group">
-                <label>Email</label>
-                <input
-                  type="email"
-                  value={profile.email}
-                  disabled
-                  className="disabled-input"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Username</label>
-                <input
-                  type="text"
-                  value={profile.username}
-                  disabled
-                  className="disabled-input"
-                />
-              </div>
-            </div>
-
-            <div className="profile-section">
-              <h3>Personal Information</h3>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>First Name</label>
-                  <input
-                    type="text"
-                    value={profile.first_name}
-                    onChange={(e) => setProfile({ ...profile, first_name: e.target.value })}
-                    placeholder="Enter your first name"
-                    disabled={saving}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Last Name</label>
-                  <input
-                    type="text"
-                    value={profile.last_name}
-                    onChange={(e) => setProfile({ ...profile, last_name: e.target.value })}
-                    placeholder="Enter your last name"
-                    disabled={saving}
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Phone Number</label>
-                <input
-                  type="tel"
-                  value={profile.phone}
-                  onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                  placeholder="Enter your phone number"
-                  disabled={saving}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Location</label>
-                <input
-                  type="text"
-                  value={profile.location}
-                  onChange={(e) => setProfile({ ...profile, location: e.target.value })}
-                  placeholder="City, Country"
-                  disabled={saving}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Bio</label>
-                <textarea
-                  value={profile.bio}
-                  onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
-                  placeholder="Tell us about yourself..."
-                  rows="4"
-                  disabled={saving}
-                />
-              </div>
-            </div>
-
-            <button type="submit" className="profile-save-btn" disabled={saving}>
-              {saving ? '💾 Saving...' : '💾 Save Changes'}
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// Rubric Evaluation Component
-const RubricEvaluation = ({ evaluation }) => {
-  if (!evaluation || !evaluation.rubric) return null;
-
-  const { rubric, evaluator } = evaluation;
-  const { response_a, response_b, overall_comparison, recommendation } = rubric;
-
-  return (
-    <div className="rubric-section">
-      <div className="rubric-header">
-        <h2>📊 AI Evaluation Results</h2>
-        <span className="evaluator-badge">Evaluated by: {evaluator}</span>
-      </div>
-
-      <div className="rubric-content">
-        <div className="rubric-scores">
-          {/* Response A (Groq) */}
-          <div className="rubric-card groq-rubric">
-            <h3>⚡ Groq (Llama 3.3)</h3>
-            <div className="total-score">
-              Total Score: <span className="score-value">{response_a.total}/50</span>
-            </div>
-            
-            <div className="criteria-scores">
-              <div className="criteria-item">
-                <span className="criteria-name">Accuracy</span>
-                <span className="criteria-score">{response_a.accuracy}/10</span>
-              </div>
-              <div className="criteria-item">
-                <span className="criteria-name">Relevance</span>
-                <span className="criteria-score">{response_a.relevance}/10</span>
-              </div>
-              <div className="criteria-item">
-                <span className="criteria-name">Clarity</span>
-                <span className="criteria-score">{response_a.clarity}/10</span>
-              </div>
-              <div className="criteria-item">
-                <span className="criteria-name">Completeness</span>
-                <span className="criteria-score">{response_a.completeness}/10</span>
-              </div>
-              <div className="criteria-item">
-                <span className="criteria-name">Usefulness</span>
-                <span className="criteria-score">{response_a.usefulness}/10</span>
-              </div>
-            </div>
-
-            <div className="strengths-weaknesses">
-              <div className="strengths">
-                <h4>✅ Strengths</h4>
-                <ul>
-                  {response_a.strengths.map((strength, idx) => (
-                    <li key={idx}>{strength}</li>
-                  ))}
-                </ul>
-              </div>
-              <div className="weaknesses">
-                <h4>⚠️ Weaknesses</h4>
-                <ul>
-                  {response_a.weaknesses.map((weakness, idx) => (
-                    <li key={idx}>{weakness}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          {/* Response B (Gemini) */}
-          <div className="rubric-card gemini-rubric">
-            <h3>✨ Gemini</h3>
-            <div className="total-score">
-              Total Score: <span className="score-value">{response_b.total}/50</span>
-            </div>
-            
-            <div className="criteria-scores">
-              <div className="criteria-item">
-                <span className="criteria-name">Accuracy</span>
-                <span className="criteria-score">{response_b.accuracy}/10</span>
-              </div>
-              <div className="criteria-item">
-                <span className="criteria-name">Relevance</span>
-                <span className="criteria-score">{response_b.relevance}/10</span>
-              </div>
-              <div className="criteria-item">
-                <span className="criteria-name">Clarity</span>
-                <span className="criteria-score">{response_b.clarity}/10</span>
-              </div>
-              <div className="criteria-item">
-                <span className="criteria-name">Completeness</span>
-                <span className="criteria-score">{response_b.completeness}/10</span>
-              </div>
-              <div className="criteria-item">
-                <span className="criteria-name">Usefulness</span>
-                <span className="criteria-score">{response_b.usefulness}/10</span>
-              </div>
-            </div>
-
-            <div className="strengths-weaknesses">
-              <div className="strengths">
-                <h4>✅ Strengths</h4>
-                <ul>
-                  {response_b.strengths.map((strength, idx) => (
-                    <li key={idx}>{strength}</li>
-                  ))}
-                </ul>
-              </div>
-              <div className="weaknesses">
-                <h4>⚠️ Weaknesses</h4>
-                <ul>
-                  {response_b.weaknesses.map((weakness, idx) => (
-                    <li key={idx}>{weakness}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Overall Comparison */}
-        <div className="rubric-summary">
-          <div className="summary-section">
-            <h3>🔍 Overall Comparison</h3>
-            <p>{overall_comparison}</p>
-          </div>
-          <div className="summary-section recommendation">
-            <h3>💡 Recommendation</h3>
-            <p>{recommendation}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// History Modal Component  -  
-const HistoryModal = ({ history, onClose, onSelectQuery }) => {
-  const getModeIcon = (mode) => {
-    switch (mode) {
-      case 'groq': return '⚡';
-      case 'gemini': return '✨';
-      case 'both': return '🔄';
-      default: return '📝';
-    }
-  };
-
-  const getModeLabel = (mode) => {
-    switch (mode) {
-      case 'groq': return 'Groq';
-      case 'gemini': return 'Gemini';
-      case 'both': return 'Both';
-      default: return mode;
-    }
-  };
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content history-modal-content" onClick={(e) => e.stopPropagation()}>
-        <button className="modal-close" onClick={onClose}>×</button>
-        <h2>📜 Query History</h2>
-        <p className="history-subtitle">Your last 5 queries</p>
-        
-        <div className="history-list">
-          {history.length === 0 ? (
-            <div className="empty-history">
-              <p>No query history yet</p>
-              <small>Your queries will appear here once you start asking questions</small>
-            </div>
-          ) : (
-            history.map((query) => (
-              <div 
-                key={query.id} 
-                className="history-item"
-                onClick={() => onSelectQuery(query)}
-              >
-                <div className="history-item-header">
-                  <span className="history-mode-badge">
-                    {getModeIcon(query.mode)} {getModeLabel(query.mode)}
-                  </span>
-                  <span className="history-timestamp">
-                    {new Date(query.created_at).toLocaleDateString()} {new Date(query.created_at).toLocaleTimeString()}
-                  </span>
-                </div>
-                
-                <div className="history-prompt">
-                  {query.prompt}
-                </div>
-
-                <div className="history-click-hint">
-                  Click to view response
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
