@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react';
 import './App.css';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+import About from './pages/About';
+
+
 
 // AI Models Configuration
 const AI_MODELS = [
@@ -194,8 +200,11 @@ function App() {
   };
 
   return (
+    <Router>
     <div className="app">
       <header className="header">
+        
+
         <div className="header-content">
           <div className="header-text">
             {user && (
@@ -212,6 +221,7 @@ function App() {
             <button onClick={toggleDarkMode} className="auth-btn theme-btn" title="Toggle theme">
               {darkMode ? '☀️' : '🌙'}
             </button>
+            <Link to="/about" className="auth-btn login-btn">About</Link>
             {user ? (
               <div className="user-menu">
                 <span className="user-name">👤 {user.username}</span>
@@ -224,113 +234,125 @@ function App() {
               </div>
             ) : (
               <div className="auth-buttons">
-                <button onClick={() => openAuthModal('login')} className="auth-btn login-btn">
-                  Sign In
-                </button>
-                <button onClick={() => openAuthModal('signup')} className="auth-btn signup-btn">
-                  Sign Up
-                </button>
+                <Link to="/login" className="auth-btn login-btn">Sign In</Link>
+                <Link to="/signup" className="auth-btn signup-btn">Sign Up</Link>
               </div>
             )}
           </div>
         </div>
       </header>
 
-      <div className="container">
-        <form onSubmit={handleSubmit} className="input-section">
-          {/* System Prompt */}
-          <div className="system-prompt-section">
-            <label className="system-prompt-label">
-              🤖 System Prompt (Optional)
-              <span className="system-prompt-hint">Set custom instructions for the AI</span>
-            </label>
-            <textarea
-              value={systemPrompt}
-              onChange={(e) => setSystemPrompt(e.target.value)}
-              placeholder="e.g., 'You are a helpful coding assistant' or 'Explain like I'm 5'"
-              rows="2"
-              disabled={loading}
-              className="system-prompt-input"
-            />
-          </div>
+      <Routes>
+        <Route path="/about" element={<About />} />
+        <Route
+          path="/login"
+          element={<Login onSuccess={(user) => setUser(user)} />}
+        />
+        <Route
+          path="/signup"
+          element={<Signup onSuccess={(user) => setUser(user)} />}
+        />
+        <Route
+          path="/"
+          element={
+            <div className="container">
+              <form onSubmit={handleSubmit} className="input-section">
+                {/* System Prompt */}
+                <div className="system-prompt-section">
+                  <label className="system-prompt-label">
+                    🤖 System Prompt (Optional)
+                    <span className="system-prompt-hint">Set custom instructions for the AI</span>
+                  </label>
+                  <textarea
+                    value={systemPrompt}
+                    onChange={(e) => setSystemPrompt(e.target.value)}
+                    placeholder="e.g., 'You are a helpful coding assistant' or 'Explain like I'm 5'"
+                    rows="2"
+                    disabled={loading}
+                    className="system-prompt-input"
+                  />
+                </div>
 
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Enter your question here"
-            rows="4"
-            disabled={loading}
-            className="prompt-input"
-          />
-          
-          {/* Compare Mode Selector */}
-          <div className="mode-selector">
-            <label className="mode-label">Select AI model:</label>
-            <div className="mode-options">
-              <button
-                type="button"
-                className={`mode-btn ${compareMode === 'both' ? 'active' : ''}`}
-                onClick={() => setCompareMode('both')}
-                disabled={loading}
-              >
-                🔄 Groq and Gemini
-              </button>
-              <button
-                type="button"
-                className={`mode-btn ${compareMode === 'groq' ? 'active' : ''}`}
-                onClick={() => setCompareMode('groq')}
-                disabled={loading}
-              >
-                ⚡ Only Groq
-              </button>
-              <button
-                type="button"
-                className={`mode-btn ${compareMode === 'gemini' ? 'active' : ''}`}
-                onClick={() => setCompareMode('gemini')}
-                disabled={loading}
-              >
-                ✨ Only Gemini
-              </button>
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder="Enter your question here"
+                  rows="4"
+                  disabled={loading}
+                  className="prompt-input"
+                />
+                
+                {/* Compare Mode Selector */}
+                <div className="mode-selector">
+                  <label className="mode-label">Select AI model:</label>
+                  <div className="mode-options">
+                    <button
+                      type="button"
+                      className={`mode-btn ${compareMode === 'both' ? 'active' : ''}`}
+                      onClick={() => setCompareMode('both')}
+                      disabled={loading}
+                    >
+                      🔄 Groq and Gemini
+                    </button>
+                    <button
+                      type="button"
+                      className={`mode-btn ${compareMode === 'groq' ? 'active' : ''}`}
+                      onClick={() => setCompareMode('groq')}
+                      disabled={loading}
+                    >
+                      ⚡ Only Groq
+                    </button>
+                    <button
+                      type="button"
+                      className={`mode-btn ${compareMode === 'gemini' ? 'active' : ''}`}
+                      onClick={() => setCompareMode('gemini')}
+                      disabled={loading}
+                    >
+                      ✨ Only Gemini
+                    </button>
+                  </div>
+                </div>
+
+                <div className="button-group">
+                  <button type="submit" disabled={loading} className="submit-btn">
+                    {loading ? '🔄 Loading...' : '✨ Get AI Response'}
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={handleCompareWithRubric} 
+                    disabled={loading || compareMode !== 'both'} 
+                    className="rubric-btn"
+                    title={compareMode !== 'both' ? 'Rubric comparison only works in "Both" mode' : 'Compare with AI-powered evaluation'}
+                  >
+                    {loading ? '🔄 Loading...' : '📊 Compare with Rubric'}
+                  </button>
+                  <button type="button" onClick={handleClear} disabled={loading} className="clear-btn">
+                    🗑️ Clear
+                  </button>
+                </div>
+              </form>
+
+              <div className="responses-section">
+                {AI_MODELS
+                  .filter(model => compareMode === 'both' || model.key === compareMode)
+                  .map(model => (
+                    <ResponseCard
+                      key={model.key}
+                      {...model}
+                      data={responses[model.key]}
+                      loading={loading}
+                    />
+                  ))}
+              </div>
+
+              {/* Rubric Evaluation Section */}
+              {showRubric && rubricEvaluation && (
+                <RubricEvaluation evaluation={rubricEvaluation} />
+              )}
             </div>
-          </div>
+            } />
+          </Routes>
 
-          <div className="button-group">
-            <button type="submit" disabled={loading} className="submit-btn">
-              {loading ? '🔄 Loading...' : '✨ Get AI Response'}
-            </button>
-            <button 
-              type="button" 
-              onClick={handleCompareWithRubric} 
-              disabled={loading || compareMode !== 'both'} 
-              className="rubric-btn"
-              title={compareMode !== 'both' ? 'Rubric comparison only works in "Both" mode' : 'Compare with AI-powered evaluation'}
-            >
-              {loading ? '🔄 Loading...' : '📊 Compare with Rubric'}
-            </button>
-            <button type="button" onClick={handleClear} disabled={loading} className="clear-btn">
-              🗑️ Clear
-            </button>
-          </div>
-        </form>
-
-        <div className="responses-section">
-          {AI_MODELS
-            .filter(model => compareMode === 'both' || model.key === compareMode)
-            .map(model => (
-              <ResponseCard
-                key={model.key}
-                {...model}
-                data={responses[model.key]}
-                loading={loading}
-              />
-            ))}
-        </div>
-
-        {/* Rubric Evaluation Section */}
-        {showRubric && rubricEvaluation && (
-          <RubricEvaluation evaluation={rubricEvaluation} />
-        )}
-      </div>
 
       <footer className="footer">
         <p>CS5610 - Final Project</p>
@@ -387,6 +409,7 @@ function App() {
         />
       )}
     </div>
+    </Router>
   );
 }
 
